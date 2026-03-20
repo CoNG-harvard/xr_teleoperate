@@ -1,0 +1,1 @@
+python teleop/teleop_tele_data.py --input-mode controller --display-mode pass-through --img-server-ip 192.168.1.232

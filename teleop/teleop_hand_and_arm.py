@@ -2,6 +2,7 @@ import time
 import argparse
 from multiprocessing import Value, Array, Lock
 import threading
+import numpy as np
 import logging_mp
 logging_mp.basic_config(level=logging_mp.INFO)
 logger_mp = logging_mp.get_logger(__name__)
@@ -93,6 +94,7 @@ if __name__ == '__main__':
     parser.add_argument('--task-goal', type = str, default = 'pick up cube.', help = 'task goal for recording at json file')
     parser.add_argument('--task-desc', type = str, default = 'task description', help = 'task description for recording at json file')
     parser.add_argument('--task-steps', type = str, default = 'step1: do this; step2: do that;', help = 'task steps for recording at json file')
+    parser.add_argument('--opposite', action='store_true', help='Operator stands opposite (facing) the robot: inverts x/y axes and swaps left/right')
 
     args = parser.parse_args()
     logger_mp.info(f"args: {args}")
@@ -288,6 +290,29 @@ if __name__ == '__main__':
 
             # get xr's tele data
             tele_data = tv_wrapper.get_tele_data()
+
+            # opposite mode: operator faces the robot, so x and y axes are inverted
+            # swap left/right and rotate 180° about z (negate x,y)
+            if args.opposite:
+                _Rz180 = np.diag([-1.0, -1.0, 1.0, 1.0])
+                # wrist poses: swap and rotate
+                l_wrist, r_wrist = tele_data.left_wrist_pose.copy(), tele_data.right_wrist_pose.copy()
+                tele_data.left_wrist_pose  = _Rz180 @ r_wrist
+                tele_data.right_wrist_pose = _Rz180 @ l_wrist
+                # hand positions / rotations: swap
+                tele_data.left_hand_pos,  tele_data.right_hand_pos  = tele_data.right_hand_pos,  tele_data.left_hand_pos
+                tele_data.left_hand_rot,  tele_data.right_hand_rot  = tele_data.right_hand_rot,  tele_data.left_hand_rot
+                # hand pinch / squeeze: swap
+                tele_data.left_hand_pinch,        tele_data.right_hand_pinch        = tele_data.right_hand_pinch,        tele_data.left_hand_pinch
+                tele_data.left_hand_pinchValue,   tele_data.right_hand_pinchValue   = tele_data.right_hand_pinchValue,   tele_data.left_hand_pinchValue
+                tele_data.left_hand_squeeze,      tele_data.right_hand_squeeze      = tele_data.right_hand_squeeze,      tele_data.left_hand_squeeze
+                tele_data.left_hand_squeezeValue, tele_data.right_hand_squeezeValue = tele_data.right_hand_squeezeValue, tele_data.left_hand_squeezeValue
+                # controller trigger / squeeze: swap
+                tele_data.left_ctrl_trigger,      tele_data.right_ctrl_trigger      = tele_data.right_ctrl_trigger,      tele_data.left_ctrl_trigger
+                tele_data.left_ctrl_triggerValue, tele_data.right_ctrl_triggerValue = tele_data.right_ctrl_triggerValue, tele_data.left_ctrl_triggerValue
+                tele_data.left_ctrl_squeeze,      tele_data.right_ctrl_squeeze      = tele_data.right_ctrl_squeeze,      tele_data.left_ctrl_squeeze
+                tele_data.left_ctrl_squeezeValue, tele_data.right_ctrl_squeezeValue = tele_data.right_ctrl_squeezeValue, tele_data.left_ctrl_squeezeValue
+
             if (args.ee == "dex3" or args.ee == "inspire_dfx" or args.ee == "inspire_ftp" or args.ee == "brainco") and args.input_mode == "hand":
                 with left_hand_pos_array.get_lock():
                     left_hand_pos_array[:] = tele_data.left_hand_pos.flatten()
