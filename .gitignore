@@ -25,3 +25,4 @@ episode_0*
 *.pkl
 
 **/*.log
+dataset/**
